@@ -14,7 +14,7 @@ class AuthService {
             this.password = password
         }
 
-        val userId = client.auth.currentUserOrNull()?.email ?: throw Exception("User creation failed")
+        val userId = client.auth.currentUserOrNull()?.id ?: throw Exception("User creation failed")
 
         // Create the user profile in the database
         client.postgrest["users_profile"].insert(
@@ -22,8 +22,7 @@ class AuthService {
                 "id" to userId,
                 "full_name" to fullName,
                 "role" to role,
-                "email" to email,
-
+                "email" to email
             )
         )
     }
@@ -34,12 +33,12 @@ class AuthService {
             this.password = password
         }
 
-        val userId = client.auth.currentUserOrNull()?.email?: throw Exception("Login failed")
+        val userId = client.auth.currentUserOrNull()?.id ?: throw Exception("Login failed")
         
         return client.postgrest["users_profile"]
             .select {
                 filter {
-                    eq("id", userId)
+                    eq("email", email)
                 }
             }
             .decodeSingle<User>()
@@ -49,5 +48,5 @@ class AuthService {
         client.auth.signOut()
     }
     
-    fun getCurrentUserId(): String? = client.auth.currentUserOrNull()?.email
+    fun getCurrentUserId(): String? = client.auth.currentUserOrNull()?.id
 }
