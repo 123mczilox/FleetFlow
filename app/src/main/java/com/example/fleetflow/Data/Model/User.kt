@@ -6,7 +6,7 @@ import kotlinx.serialization.Serializable
 data class User(
     val id: String,
     val full_name: String,
-    val role: String,//owner or driver
+    val role: String, // owner or driver
     val email: String,
-    val created_at: String
+    val created_at: String? = null
 )

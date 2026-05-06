@@ -12,10 +12,12 @@ import androidx.navigation.compose.rememberNavController
 import com.example.fleetflow.ui.Auth.LoginScreen
 import com.example.fleetflow.ui.Auth.RegisterScreen
 import com.example.fleetflow.ui.Driver.DriverDashboardScreen
+import com.example.fleetflow.ui.Driver.MyVehicleScreen
 import com.example.fleetflow.ui.Driver.RecordTripScreen
 import com.example.fleetflow.ui.Owner.AddVehicleScreen
 import com.example.fleetflow.ui.Owner.OwnerDashboardScreen
 import com.example.fleetflow.ui.Owner.TripOverviewScreen
+import com.example.fleetflow.ui.Owner.MaintenanceScreen
 import com.example.fleetflow.ui.Owner.VehicleScreen
 
 @Composable
@@ -80,9 +82,7 @@ fun AppNavigation() {
             TripOverviewScreen()
         }
         composable(Screen.Maintenance.route) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Maintenance Screen - Coming Soon")
-            }
+            MaintenanceScreen()
         }
 
         // Driver Section
@@ -98,9 +98,7 @@ fun AppNavigation() {
             )
         }
         composable(Screen.MyVehicle.route) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("My Vehicle Screen - Coming Soon")
-            }
+            MyVehicleScreen()
         }
     }
 }

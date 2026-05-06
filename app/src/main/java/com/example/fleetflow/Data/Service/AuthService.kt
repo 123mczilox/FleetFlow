@@ -9,15 +9,24 @@ class AuthService {
     private val client = SupabaseClient.client
 
     suspend fun signUp(email: String, password: String, fullName: String, role: String) {
-        client.auth.signUpWith(Email) {
-            this.email = email
-            this.password = password
+        try {
+            client.auth.signUpWith(Email) {
+                this.email = email
+                this.password = password
+            }
+        } catch (e: Exception) {
+            // If user already exists in Auth, we still try to create/update the profile
+            if (e.message?.contains("already registered", ignoreCase = true) != true) {
+                throw e
+            }
         }
 
-        val userId = client.auth.currentUserOrNull()?.id ?: throw Exception("User creation failed")
+        val userId = client.auth.currentUserOrNull()?.id 
+            ?: client.auth.retrieveUserForCurrentSession().id
 
         // Create the user profile in the database
-        client.postgrest["users_profile"].insert(
+        // Using upsert ensures that if the profile exists, it updates; if not, it creates.
+        client.postgrest["users_profile"].upsert(
             mapOf(
                 "id" to userId,
                 "full_name" to fullName,
@@ -38,7 +47,7 @@ class AuthService {
         return client.postgrest["users_profile"]
             .select {
                 filter {
-                    eq("email", email)
+                    eq("id", userId)
                 }
             }
             .decodeSingle<User>()

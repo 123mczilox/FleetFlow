@@ -4,9 +4,10 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class Maintenance(
-    val id: Int,
-    val vehicle_id: Int,
+    val id: String? = null,
+    val vehicle_id: String,
     val date: String,
-
-    val created_at: String,
+    val description: String? = null,
+    val cost: Double = 0.0,
+    val created_at: String? = null
 )
