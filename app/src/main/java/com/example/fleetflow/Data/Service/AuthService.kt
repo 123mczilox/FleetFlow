@@ -8,7 +8,7 @@ import io.github.jan.supabase.postgrest.postgrest
 class AuthService {
     private val client = SupabaseClient.client
 
-    suspend fun signUp(email: String, password: String, fullName: String, role: String) {
+    suspend fun signUp(email: String, password: String, fullName: String, role: String, phoneNumber: String): User {
         try {
             client.auth.signUpWith(Email) {
                 this.email = email
@@ -25,15 +25,17 @@ class AuthService {
             ?: client.auth.retrieveUserForCurrentSession().id
 
         // Create the user profile in the database
-        // Using upsert ensures that if the profile exists, it updates; if not, it creates.
-        client.postgrest["users_profile"].upsert(
-            mapOf(
-                "id" to userId,
-                "full_name" to fullName,
-                "role" to role,
-                "email" to email
-            )
+        val userProfile = User(
+            id = userId,
+            full_name = fullName,
+            role = role,
+            email = email,
+            phone_number = phoneNumber
         )
+
+        client.postgrest["users_profile"].upsert(userProfile)
+        
+        return userProfile
     }
 
     suspend fun signIn(email: String, password: String): User {
@@ -53,9 +55,31 @@ class AuthService {
             .decodeSingle<User>()
     }
 
+    suspend fun resetPassword(email: String) {
+        client.auth.resetPasswordForEmail(email)
+    }
+
     suspend fun signOut() {
         client.auth.signOut()
     }
     
-    fun getCurrentUserId(): String? = client.auth.currentUserOrNull()?.id
+    suspend fun getUserProfile(userId: String): User {
+        return client.postgrest["users_profile"]
+            .select {
+                filter {
+                    eq("id", userId)
+                }
+            }
+            .decodeSingle<User>()
+    }
+
+    suspend fun getAllDrivers(): List<User> {
+        return client.postgrest["users_profile"]
+            .select {
+                filter {
+                    eq("role", "driver")
+                }
+            }
+            .decodeList<User>()
+    }
 }

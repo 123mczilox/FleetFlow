@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
@@ -18,7 +20,16 @@ import com.example.fleetflow.ui.Owner.AddVehicleScreen
 import com.example.fleetflow.ui.Owner.OwnerDashboardScreen
 import com.example.fleetflow.ui.Owner.TripOverviewScreen
 import com.example.fleetflow.ui.Owner.MaintenanceScreen
+import com.example.fleetflow.ui.Owner.OwnerViewModel
+import com.example.fleetflow.ui.Driver.DriverViewModel
+
+import com.example.fleetflow.ui.Welcome.OnboardingScreen
+import com.example.fleetflow.ui.Welcome.SplashScreen
+
+import com.example.fleetflow.ui.Owner.DriversManagementScreen
 import com.example.fleetflow.ui.Owner.VehicleScreen
+import com.example.fleetflow.ui.Owner.ReportsListScreen
+import com.example.fleetflow.ui.Driver.ReportScreen
 
 @Composable
 fun AppNavigation() {
@@ -26,17 +37,35 @@ fun AppNavigation() {
 
     NavHost(
         navController = navController,
-        startDestination = Screen.Login.route
+        startDestination = Screen.Splash.route
     ) {
+        composable(Screen.Splash.route) {
+            SplashScreen(
+                onLoadingFinished = {
+                    navController.navigate(Screen.Onboarding.route) {
+                        popUpTo(Screen.Splash.route) { inclusive = true }
+                    }
+                }
+            )
+        }
+        composable(Screen.Onboarding.route) {
+            OnboardingScreen(
+                onGetStarted = {
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(Screen.Onboarding.route) { inclusive = true }
+                    }
+                }
+            )
+        }
         composable(Screen.Login.route) {
             LoginScreen(
-                onLoginSuccess = { role ->
-                    if (role == "owner") {
-                        navController.navigate(Screen.OwnerDashboard.route) {
+                onLoginSuccess = { user ->
+                    if (user.role == "owner") {
+                        navController.navigate(Screen.OwnerDashboard.route + "/${user.id}") {
                             popUpTo(Screen.Login.route) { inclusive = true }
                         }
                     } else {
-                        navController.navigate(Screen.DriverDashboard.route) {
+                        navController.navigate(Screen.DriverDashboard.route + "/${user.id}") {
                             popUpTo(Screen.Login.route) { inclusive = true }
                         }
                     }
@@ -49,9 +78,15 @@ fun AppNavigation() {
 
         composable(Screen.Register.route) {
             RegisterScreen(
-                onRegisterSuccess = {
-                    navController.navigate(Screen.Login.route) {
-                        popUpTo(Screen.Register.route) { inclusive = true }
+                onRegisterSuccess = { user ->
+                    if (user.role == "owner") {
+                        navController.navigate(Screen.OwnerDashboard.route + "/${user.id}") {
+                            popUpTo(Screen.Register.route) { inclusive = true }
+                        }
+                    } else {
+                        navController.navigate(Screen.DriverDashboard.route + "/${user.id}") {
+                            popUpTo(Screen.Register.route) { inclusive = true }
+                        }
                     }
                 },
                 onNavigateToLogin = {
@@ -60,12 +95,20 @@ fun AppNavigation() {
             )
         }
 
-        // Owner Section
-        composable(Screen.OwnerDashboard.route) {
+        composable(Screen.OwnerDashboard.route + "/{ownerId}") { backStackEntry ->
+            val ownerId = backStackEntry.arguments?.getString("ownerId") ?: ""
             OwnerDashboardScreen(
+                ownerId = ownerId,
                 onNavigateToVehicles = { navController.navigate(Screen.Vehicles.route) },
                 onNavigateToTrips = { navController.navigate(Screen.TripOverview.route) },
-                onNavigateToMaintenance = { navController.navigate(Screen.Maintenance.route) }
+                onNavigateToMaintenance = { navController.navigate(Screen.Maintenance.route) },
+                onNavigateToReports = { navController.navigate(Screen.Reports.route) },
+                onNavigateToDrivers = { id -> navController.navigate(Screen.Drivers.route + "/$id") },
+                onLogout = {
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                }
             )
         }
         composable(Screen.Vehicles.route) {
@@ -84,12 +127,23 @@ fun AppNavigation() {
         composable(Screen.Maintenance.route) {
             MaintenanceScreen()
         }
+        composable(Screen.Reports.route) {
+            ReportsListScreen()
+        }
 
         // Driver Section
-        composable(Screen.DriverDashboard.route) {
+        composable(Screen.DriverDashboard.route + "/{driverId}") { backStackEntry ->
+            val driverId = backStackEntry.arguments?.getString("driverId") ?: ""
             DriverDashboardScreen(
+                driverId = driverId,
                 onNavigateToRecordTrip = { navController.navigate(Screen.RecordTrip.route) },
-                onNavigateToMyVehicle = { navController.navigate(Screen.MyVehicle.route) }
+                onNavigateToMyVehicle = { navController.navigate(Screen.MyVehicle.route) },
+                onNavigateToReport = { navController.navigate(Screen.MakeReport.route) },
+                onLogout = {
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                }
             )
         }
         composable(Screen.RecordTrip.route) {
@@ -97,8 +151,17 @@ fun AppNavigation() {
                 onTripRecorded = { navController.popBackStack() }
             )
         }
+        composable(Screen.MakeReport.route) {
+            ReportScreen(
+                onReportSubmitted = { navController.popBackStack() }
+            )
+        }
         composable(Screen.MyVehicle.route) {
             MyVehicleScreen()
+        }
+        composable(Screen.Drivers.route + "/{ownerId}") { backStackEntry ->
+            val ownerId = backStackEntry.arguments?.getString("ownerId") ?: ""
+            DriversManagementScreen(ownerId = ownerId)
         }
     }
 }

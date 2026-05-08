@@ -8,5 +8,6 @@ data class User(
     val full_name: String,
     val role: String, // owner or driver
     val email: String,
+    val phone_number: String? = null,
     val created_at: String? = null
 )

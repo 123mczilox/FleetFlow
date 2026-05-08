@@ -5,10 +5,16 @@ import com.example.fleetflow.Data.Service.AuthService
 
 class AuthRepository(private val authService: AuthService = AuthService()) {
 
-    suspend fun signUp(email: String, password: String, fullName: String, role: String): Result<Unit> {
+    suspend fun signUp(
+        email: String,
+        password: String,
+        fullName: String,
+        role: String,
+        phoneNumber: String
+    ): Result<User> {
         return try {
-            authService.signUp(email, password, fullName, role)
-            Result.success(Unit)
+            val user = authService.signUp(email, password, fullName, role, phoneNumber)
+            Result.success(user)
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -23,6 +29,15 @@ class AuthRepository(private val authService: AuthService = AuthService()) {
         }
     }
 
+    suspend fun resetPassword(email: String): Result<Unit> {
+        return try {
+            authService.resetPassword(email)
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun signOut(): Result<Unit> {
         return try {
             authService.signOut()
@@ -32,5 +47,21 @@ class AuthRepository(private val authService: AuthService = AuthService()) {
         }
     }
 
-    fun getCurrentUserId(): String? = authService.getCurrentUserId()
+    suspend fun getUserProfile(userId: String): Result<User> {
+        return try {
+            val user = authService.getUserProfile(userId)
+            Result.success(user)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getAllDrivers(): Result<List<User>> {
+        return try {
+            val drivers = authService.getAllDrivers()
+            Result.success(drivers)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }

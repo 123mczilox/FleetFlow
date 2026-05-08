@@ -1,18 +1,31 @@
 package com.example.fleetflow.ui.Auth
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Login
+import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.fleetflow.Data.Model.User
 
 @Composable
 fun LoginScreen(
-    onLoginSuccess: (String) -> Unit, // role (owner/driver)
+    onLoginSuccess: (User) -> Unit,
     onNavigateToRegister: () -> Unit
 ) {
     val viewModel: AuthViewModel = viewModel()
@@ -20,67 +33,200 @@ fun LoginScreen(
 
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var passwordVisible by remember { mutableStateOf(false) }
+    var showForgotPasswordDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState) {
         if (uiState is AuthUiState.Success) {
-            onLoginSuccess((uiState as AuthUiState.Success).user.role)
+            onLoginSuccess((uiState as AuthUiState.Success).user)
         }
     }
 
-    Column(
+    if (showForgotPasswordDialog) {
+        ForgotPasswordDialog(
+            onDismiss = { showForgotPasswordDialog = false },
+            onSubmit = { resetEmail ->
+                viewModel.resetPassword(resetEmail)
+                showForgotPasswordDialog = false
+            }
+        )
+    }
+
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(Color(0xFF8E2DE2), Color(0xFFF09819))
+                )
+            ),
+        contentAlignment = Alignment.Center
     ) {
-        Text(text = "FleetFlow", fontSize = 32.sp, style = MaterialTheme.typography.headlineLarge)
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(text = "Smart Fleet Management", fontSize = 16.sp, color = MaterialTheme.colorScheme.secondary)
-        
-        Spacer(modifier = Modifier.height(48.dp))
-
-        OutlinedTextField(
-            value = email,
-            onValueChange = { email = it },
-            label = { Text("Email") },
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        OutlinedTextField(
-            value = password,
-            onValueChange = { password = it },
-            label = { Text("Password") },
-            visualTransformation = PasswordVisualTransformation(),
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        if (uiState is AuthUiState.Loading) {
-            CircularProgressIndicator()
-        } else {
-            Button(
-                onClick = { viewModel.signIn(email, password) },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = email.isNotEmpty() && password.isNotEmpty()
+        Card(
+            modifier = Modifier
+                .fillMaxWidth(0.9f)
+                .padding(16.dp),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text("Login")
+                // Logo
+                Surface(
+                    modifier = Modifier.size(64.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    color = Color(0xFF8E2DE2)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.DirectionsCar,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "FleetFlow",
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF8E2DE2)
+                )
+                Text(
+                    text = "Smart Fleet Management",
+                    fontSize = 14.sp,
+                    color = Color.Gray
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                OutlinedTextField(
+                    value = email,
+                    onValueChange = { email = it },
+                    label = { Text("Email") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Password") },
+                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    trailingIcon = {
+                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                            Icon(
+                                imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                contentDescription = if (passwordVisible) "Hide password" else "Show password",
+                                tint = Color.Gray
+                            )
+                        }
+                    }
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = { showForgotPasswordDialog = true }) {
+                        Text("Forgot Password?", color = Color(0xFF8E2DE2), fontSize = 12.sp)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                if (uiState is AuthUiState.Loading) {
+                    CircularProgressIndicator(color = Color(0xFF8E2DE2))
+                } else {
+                    Button(
+                        onClick = { viewModel.signIn(email, password) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8E2DE2)),
+                        enabled = email.isNotEmpty() && password.isNotEmpty()
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.AutoMirrored.Filled.Login, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Login to FleetFlow", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
+                if (uiState is AuthUiState.Error) {
+                    Text(
+                        text = (uiState as AuthUiState.Error).message,
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+
+                if (uiState is AuthUiState.ResetPasswordSent) {
+                    Text(
+                        text = "Reset link sent to your email",
+                        color = Color(0xFF2E7D32),
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+
+                TextButton(
+                    onClick = onNavigateToRegister,
+                    modifier = Modifier.padding(top = 8.dp)
+                ) {
+                    Text("Don't have an account? Register", color = Color.Gray)
+                }
             }
         }
-
-        if (uiState is AuthUiState.Error) {
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = (uiState as AuthUiState.Error).message,
-                color = MaterialTheme.colorScheme.error
-            )
-        }
-
-        TextButton(onClick = onNavigateToRegister) {
-            Text("Don't have an account? Register")
-        }
     }
+}
+
+@Composable
+fun ForgotPasswordDialog(
+    onDismiss: () -> Unit,
+    onSubmit: (String) -> Unit
+) {
+    var email by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Reset Password") },
+        text = {
+            Column {
+                Text("Enter your email address and we'll send you a link to reset your password.")
+                Spacer(modifier = Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = email,
+                    onValueChange = { email = it },
+                    label = { Text("Email") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onSubmit(email) },
+                enabled = email.isNotEmpty(),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8E2DE2))
+            ) {
+                Text("Send Link")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }

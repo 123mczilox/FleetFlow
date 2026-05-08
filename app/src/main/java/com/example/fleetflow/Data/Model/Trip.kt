@@ -9,8 +9,6 @@ data class Trip(
     val driver_id: String,
     val trips_count: Int,
     val revenue: Double,
-    val created_at: String? = null,
-    val is_locked: Boolean = false
+    val is_locked: Boolean = false,
+    val created_at: String? = null
 )
-
-

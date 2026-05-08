@@ -10,6 +10,14 @@ class VehicleService {
         client.postgrest["vehicles"].insert(vehicle)
     }
 
+    suspend fun updateVehicle(vehicle: Vehicle) {
+        client.postgrest["vehicles"].update(vehicle) {
+            filter {
+                eq("id", vehicle.id)
+            }
+        }
+    }
+
     suspend fun getVehiclesByOwner(ownerId: String): List<Vehicle> {
         return client.postgrest["vehicles"].select {
             filter {

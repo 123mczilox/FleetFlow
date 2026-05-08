@@ -29,15 +29,29 @@ class AuthViewModel : ViewModel() {
         }
     }
 
-    fun signUp(email: String, password: String, fullName: String, role: String) {
+    fun signUp(email: String, password: String, fullName: String, role: String, phoneNumber: String) {
         viewModelScope.launch {
             _uiState.value = AuthUiState.Loading
-            repository.signUp(email, password, fullName, role).fold(
-                onSuccess = {
-                    _uiState.value = AuthUiState.RegistrationSuccess
+            repository.signUp(email, password, fullName, role, phoneNumber).fold(
+                onSuccess = { user ->
+                    _uiState.value = AuthUiState.Success(user)
                 },
                 onFailure = { error ->
                     _uiState.value = AuthUiState.Error(error.message ?: "Registration failed")
+                }
+            )
+        }
+    }
+
+    fun resetPassword(email: String) {
+        viewModelScope.launch {
+            _uiState.value = AuthUiState.Loading
+            repository.resetPassword(email).fold(
+                onSuccess = {
+                    _uiState.value = AuthUiState.ResetPasswordSent
+                },
+                onFailure = { error ->
+                    _uiState.value = AuthUiState.Error(error.message ?: "Reset failed")
                 }
             )
         }
@@ -52,6 +66,6 @@ sealed class AuthUiState {
     object Idle : AuthUiState()
     object Loading : AuthUiState()
     data class Success(val user: User) : AuthUiState()
-    object RegistrationSuccess : AuthUiState()
+    object ResetPasswordSent : AuthUiState()
     data class Error(val message: String) : AuthUiState()
 }
