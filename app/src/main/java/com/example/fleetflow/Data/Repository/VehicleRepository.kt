@@ -8,4 +8,6 @@ class VehicleRepository(private val vehicleService: VehicleService) {
     suspend fun getVehiclesByOwner(ownerId: String) = vehicleService.getVehiclesByOwner(ownerId)
     suspend fun getVehicleByDriver(driverId: String) = vehicleService.getVehicleByDriver(driverId)
     suspend fun updateVehicle(vehicle: Vehicle) = vehicleService.updateVehicle(vehicle)
+    suspend fun getAllVehicles() = vehicleService.getAllVehicles()
+    suspend fun clearDriverAssignment(driverId: String) = vehicleService.clearDriverAssignment(driverId)
 }

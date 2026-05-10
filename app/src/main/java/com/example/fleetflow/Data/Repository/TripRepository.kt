@@ -7,4 +7,5 @@ class TripRepository(private val tripService: TripService) {
     suspend fun recordTrip(trip: Trip) = tripService.recordTrip(trip)
     suspend fun getTripsByVehicle(vehicleId: String) = tripService.getTripsByVehicle(vehicleId)
     suspend fun getTripsByDriver(driverId: String) = tripService.getTripsByDriver(driverId)
+    suspend fun getTripsByVehicles(vehicleIds: List<String>) = tripService.getTripsByVehicles(vehicleIds)
 }

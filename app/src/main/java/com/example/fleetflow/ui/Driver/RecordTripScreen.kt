@@ -8,6 +8,9 @@ import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -26,10 +29,11 @@ fun RecordTripScreen(
     onTripRecorded: () -> Unit,
     viewModel: DriverViewModel = viewModel()
 ) {
-    var tripsCount by remember { mutableStateOf("") }
-    var revenue by remember { mutableStateOf("") }
+    var tripsCount by rememberSaveable { mutableStateOf("") }
+    var revenue by rememberSaveable { mutableStateOf("") }
     val user = SupabaseClient.client.auth.currentUserOrNull()
     val assignedVehicle by viewModel.assignedVehicle.collectAsState()
+    val scrollState = rememberScrollState()
 
     LaunchedEffect(Unit) {
         user?.let { viewModel.fetchAssignedVehicle(it.id) }
@@ -50,6 +54,7 @@ fun RecordTripScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+                .verticalScroll(scrollState)
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {

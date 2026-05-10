@@ -9,6 +9,8 @@ import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.*
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
@@ -24,6 +26,7 @@ import com.example.fleetflow.Data.Model.Vehicle
 import com.example.fleetflow.Data.Service.SupabaseClient
 import io.github.jan.supabase.auth.auth
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DriverDashboardScreen(
     driverId: String,
@@ -37,7 +40,10 @@ fun DriverDashboardScreen(
     val totalTrips by viewModel.totalTrips.collectAsState()
     val totalRevenue by viewModel.totalRevenue.collectAsState()
     val todayRevenue by viewModel.todayRevenue.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
     val user = SupabaseClient.client.auth.currentUserOrNull()
+    
+    val pullToRefreshState = rememberPullToRefreshState()
 
     LaunchedEffect(driverId) {
         viewModel.fetchAssignedVehicle(driverId)
@@ -46,110 +52,117 @@ fun DriverDashboardScreen(
     Scaffold(
         containerColor = Color(0xFFF8F9FA)
     ) { paddingValues ->
-        LazyColumn(
+        PullToRefreshBox(
+            isRefreshing = isLoading,
+            onRefresh = { viewModel.fetchAssignedVehicle(driverId) },
+            state = pullToRefreshState,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Header
-            item {
-                DriverHeaderSection(
-                    userName = user?.userMetadata?.get("full_name")?.toString() ?: "Driver",
-                    onLogout = onLogout
-                )
-            }
-
-            // Stats
-            item {
-                val dailyTarget = assignedVehicle?.daily_target ?: 0.0
-                val status = when {
-                    dailyTarget <= 0 -> "No Target Set"
-                    todayRevenue >= dailyTarget -> "Excellent"
-                    todayRevenue >= dailyTarget * 0.8 -> "Good"
-                    todayRevenue >= dailyTarget * 0.5 -> "Fair"
-                    else -> "Low"
-                }
-                val statusColor = when(status) {
-                    "Excellent" -> Color(0xFF4CAF50)
-                    "Good" -> Color(0xFF8BC34A)
-                    "Fair" -> Color(0xFFFFC107)
-                    "Low" -> Color(0xFFF44336)
-                    else -> Color.Gray
-                }
-
-                Column(modifier = Modifier.padding(16.dp)) {
-                    DriverStatsGrid(
-                        trips = totalTrips.toString(),
-                        revenue = String.format("%.1fK", totalRevenue / 1000),
-                        today = String.format("%.1fK", todayRevenue / 1000)
+            LazyColumn(
+                modifier = Modifier.fillMaxSize()
+            ) {
+                // Header
+                item {
+                    DriverHeaderSection(
+                        userName = user?.userMetadata?.get("full_name")?.toString() ?: "Driver",
+                        onLogout = onLogout
                     )
-                    
-                    if (dailyTarget > 0) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(containerColor = statusColor.copy(alpha = 0.1f))
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
+                }
+
+                // Stats
+                item {
+                    val dailyTarget = assignedVehicle?.daily_target ?: 0.0
+                    val status = when {
+                        dailyTarget <= 0 -> "No Target Set"
+                        todayRevenue >= dailyTarget -> "Excellent"
+                        todayRevenue >= dailyTarget * 0.8 -> "Good"
+                        todayRevenue >= dailyTarget * 0.5 -> "Fair"
+                        else -> "Low"
+                    }
+                    val statusColor = when(status) {
+                        "Excellent" -> Color(0xFF4CAF50)
+                        "Good" -> Color(0xFF8BC34A)
+                        "Fair" -> Color(0xFFFFC107)
+                        "Low" -> Color(0xFFF44336)
+                        else -> Color.Gray
+                    }
+
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        DriverStatsGrid(
+                            trips = totalTrips.toString(),
+                            revenue = String.format("%.1fK", totalRevenue / 1000),
+                            today = String.format("%.1fK", todayRevenue / 1000)
+                        )
+                        
+                        if (dailyTarget > 0) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(containerColor = statusColor.copy(alpha = 0.1f))
                             ) {
-                                Column {
-                                    Text("Daily Performance", fontSize = 12.sp, color = Color.Gray)
-                                    Text(status, fontWeight = FontWeight.Bold, color = statusColor)
-                                }
-                                Column(horizontalAlignment = Alignment.End) {
-                                    Text("Target: KSh $dailyTarget", fontSize = 12.sp, color = Color.Gray)
-                                    Text("Progress: ${((todayRevenue / dailyTarget) * 100).toInt()}%", fontWeight = FontWeight.Bold)
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column {
+                                        Text("Daily Performance", fontSize = 12.sp, color = Color.Gray)
+                                        Text(status, fontWeight = FontWeight.Bold, color = statusColor)
+                                    }
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        Text("Target: KSh $dailyTarget", fontSize = 12.sp, color = Color.Gray)
+                                        Text("Progress: ${((todayRevenue / dailyTarget) * 100).toInt()}%", fontWeight = FontWeight.Bold)
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
 
-            // My Assigned Vehicle
-            item {
-                AssignedVehicleCard(assignedVehicle, onNavigateToMyVehicle)
-            }
+                // My Assigned Vehicle
+                item {
+                    AssignedVehicleCard(assignedVehicle, onNavigateToMyVehicle)
+                }
 
-            // Record New Trip Button
-            item {
-                Spacer(modifier = Modifier.height(24.dp))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
-                ) {
-                    Button(
-                        onClick = onNavigateToRecordTrip,
+                // Record New Trip Button
+                item {
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Row(
                         modifier = Modifier
-                            .weight(1f)
-                            .height(56.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF008080))
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Add, contentDescription = null)
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Record Trip", fontWeight = FontWeight.Bold)
+                        Button(
+                            onClick = onNavigateToRecordTrip,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(56.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF008080))
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Add, contentDescription = null)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Record Trip", fontWeight = FontWeight.Bold)
+                            }
                         }
-                    }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Button(
-                        onClick = onNavigateToReport,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(56.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD63031))
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Report, contentDescription = null)
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Report", fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Button(
+                            onClick = onNavigateToReport,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(56.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD63031))
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Report, contentDescription = null)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Report", fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 }

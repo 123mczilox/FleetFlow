@@ -38,6 +38,9 @@ class OwnerViewModel : ViewModel() {
     private val _vehicles = MutableStateFlow<List<Vehicle>>(emptyList())
     val vehicles: StateFlow<List<Vehicle>> = _vehicles
 
+    private val _allVehicles = MutableStateFlow<List<Vehicle>>(emptyList())
+    val allVehicles: StateFlow<List<Vehicle>> = _allVehicles
+
     private val _trips = MutableStateFlow<List<Trip>>(emptyList())
     val trips: StateFlow<List<Trip>> = _trips
 
@@ -77,41 +80,41 @@ class OwnerViewModel : ViewModel() {
         viewModelScope.launch {
             _isLoading.value = true
             try {
-                // Fetch profile
+                // Fetch profile first
                 _currentUser.value = authService.getUserProfile(ownerId)
 
-                // Fetch vehicles
+                // Fetch vehicles belonging to this owner
                 val fetchedVehicles = vehicleRepository.getVehiclesByOwner(ownerId)
                 _vehicles.value = fetchedVehicles
                 
-                // Fetch other data in parallel
-                val tripsJob = async {
-                    val allTrips = mutableListOf<Trip>()
-                    fetchedVehicles.forEach { vehicle ->
-                        allTrips.addAll(tripRepository.getTripsByVehicle(vehicle.id))
+                // Fetch all drivers and all vehicles (for global assignment status)
+                val driversList = try { driverRepository.getAllDrivers() } catch (e: Exception) { emptyList() }
+                _drivers.value = driversList
+                
+                val allVehList = try { vehicleRepository.getAllVehicles() } catch (e: Exception) { emptyList() }
+                _allVehicles.value = allVehList
+
+                if (fetchedVehicles.isNotEmpty()) {
+                    val vehicleIds = fetchedVehicles.map { it.id }
+
+                    val tripsJob = async { 
+                        try { tripRepository.getTripsByVehicles(vehicleIds) } catch (e: Exception) { emptyList() }
                     }
-                    allTrips
-                }
-
-                val maintenanceJob = async {
-                    val allLogs = mutableListOf<Maintenance>()
-                    fetchedVehicles.forEach { vehicle ->
-                        allLogs.addAll(maintenanceRepository.getMaintenanceLogs(vehicle.id))
+                    val maintenanceJob = async { 
+                        try { maintenanceRepository.getMaintenanceByVehicles(vehicleIds) } catch (e: Exception) { emptyList() }
                     }
-                    allLogs.sortedByDescending { it.date }
+                    val reportsJob = async { 
+                        try { reportRepository.getReportsByOwner(ownerId) } catch (e: Exception) { emptyList() }
+                    }
+
+                    _trips.value = tripsJob.await()
+                    _maintenanceLogs.value = maintenanceJob.await().sortedByDescending { it.date }
+                    _reports.value = reportsJob.await()
                 }
-
-                val reportsJob = async { reportRepository.getReportsByOwner(ownerId) }
-                val driversJob = async { driverRepository.getAllDrivers() }
-
-                _trips.value = tripsJob.await()
-                _maintenanceLogs.value = maintenanceJob.await()
-                _reports.value = reportsJob.await()
-                _drivers.value = driversJob.await()
 
                 _error.value = null
             } catch (e: Exception) {
-                _error.value = "Error fetching owner data: ${e.message}"
+                _error.value = "Error fetching dashboard: ${e.message}"
             } finally {
                 _isLoading.value = false
             }
@@ -137,7 +140,7 @@ class OwnerViewModel : ViewModel() {
             _isLoading.value = true
             try {
                 vehicleRepository.addVehicle(vehicle)
-                fetchVehicles(vehicle.owner_id)
+                fetchOwnerData(vehicle.owner_id)
                 _error.value = null
             } catch (e: Exception) {
                 _error.value = e.message ?: "Failed to add vehicle"
@@ -151,12 +154,15 @@ class OwnerViewModel : ViewModel() {
         viewModelScope.launch {
             _isLoading.value = true
             try {
-                // Fetch in parallel using async
+                // Fetch in parallel
                 val driversJob = async { driverRepository.getAllDrivers() }
-                val vehiclesJob = async { vehicleRepository.getVehiclesByOwner(ownerId) }
+                val ownerVehiclesJob = async { vehicleRepository.getVehiclesByOwner(ownerId) }
+                val allVehiclesJob = async { vehicleRepository.getAllVehicles() }
                 
                 _drivers.value = driversJob.await()
-                _vehicles.value = vehiclesJob.await()
+                _vehicles.value = ownerVehiclesJob.await()
+                _allVehicles.value = allVehiclesJob.await()
+                
                 _error.value = null
             } catch (e: Exception) {
                 _error.value = "Failed to load management data: ${e.message}"
@@ -188,12 +194,18 @@ class OwnerViewModel : ViewModel() {
         viewModelScope.launch {
             _isLoading.value = true
             try {
+                // 1. Clear any previous assignment for this driver from ANY vehicle in the system
+                vehicleRepository.clearDriverAssignment(driverId)
+                
+                // 2. Assign to the new vehicle
                 val updatedVehicle = vehicle.copy(
                     assigned_driver_id = driverId,
                     daily_target = dailyTarget
                 )
                 vehicleRepository.updateVehicle(updatedVehicle)
-                fetchVehicles(vehicle.owner_id)
+                
+                // 3. Refresh all owner data to ensure consistency
+                fetchOwnerData(vehicle.owner_id)
                 _error.value = null
             } catch (e: Exception) {
                 _error.value = "Error assigning driver: ${e.message}"
@@ -208,11 +220,12 @@ class OwnerViewModel : ViewModel() {
             _isLoading.value = true
             try {
                 val ownerVehicles = vehicleRepository.getVehiclesByOwner(ownerId)
-                val allTrips = mutableListOf<Trip>()
-                ownerVehicles.forEach { vehicle ->
-                    allTrips.addAll(tripRepository.getTripsByVehicle(vehicle.id))
+                if (ownerVehicles.isNotEmpty()) {
+                    val vehicleIds = ownerVehicles.map { it.id }
+                    _trips.value = tripRepository.getTripsByVehicles(vehicleIds)
+                } else {
+                    _trips.value = emptyList()
                 }
-                _trips.value = allTrips
                 _error.value = null
             } catch (e: Exception) {
                 _error.value = "Error fetching trips: ${e.message}"
@@ -227,12 +240,13 @@ class OwnerViewModel : ViewModel() {
             _isLoading.value = true
             try {
                 val ownerVehicles = vehicleRepository.getVehiclesByOwner(ownerId)
-                val allLogs = mutableListOf<Maintenance>()
-                ownerVehicles.forEach { vehicle ->
-                    allLogs.addAll(maintenanceRepository.getMaintenanceLogs(vehicle.id))
+                if (ownerVehicles.isNotEmpty()) {
+                    val vehicleIds = ownerVehicles.map { it.id }
+                    val allLogs = maintenanceRepository.getMaintenanceByVehicles(vehicleIds)
+                    _maintenanceLogs.value = allLogs.sortedByDescending { it.date }
+                } else {
+                    _maintenanceLogs.value = emptyList()
                 }
-                // Sort by date descending
-                _maintenanceLogs.value = allLogs.sortedByDescending { it.date }
                 _error.value = null
             } catch (e: Exception) {
                 _error.value = "Error fetching maintenance: ${e.message}"

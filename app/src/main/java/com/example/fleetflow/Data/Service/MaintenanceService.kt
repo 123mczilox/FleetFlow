@@ -17,4 +17,12 @@ class MaintenanceService {
     suspend fun addMaintenanceLog(log: Maintenance) {
         client.postgrest["maintenance"].insert(log)
     }
+
+    suspend fun getMaintenanceByVehicles(vehicleIds: List<String>): List<Maintenance> {
+        return client.postgrest["maintenance"].select {
+            filter {
+                isIn("vehicle_id", vehicleIds)
+            }
+        }.decodeList<Maintenance>()
+    }
 }

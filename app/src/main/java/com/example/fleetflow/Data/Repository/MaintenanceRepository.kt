@@ -6,4 +6,5 @@ import com.example.fleetflow.Data.Service.MaintenanceService
 class MaintenanceRepository(private val maintenanceService: MaintenanceService) {
     suspend fun getMaintenanceLogs(vehicleId: String) = maintenanceService.getMaintenanceLogs(vehicleId)
     suspend fun addMaintenanceLog(log: Maintenance) = maintenanceService.addMaintenanceLog(log)
+    suspend fun getMaintenanceByVehicles(vehicleIds: List<String>) = maintenanceService.getMaintenanceByVehicles(vehicleIds)
 }

@@ -80,7 +80,8 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
 
     coreLibraryDesugaring(libs.desugar.jdk.libs)
-
+//splash screen
+    implementation(libs.androidx.core.splashscreen)
 
 
 

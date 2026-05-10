@@ -25,4 +25,19 @@ class TripService {
             }
         }.decodeList<Trip>()
     }
+
+    suspend fun getTripsByVehicles(vehicleIds: List<String>): List<Trip> {
+        return client.postgrest["trips"].select {
+            filter {
+                isIn("vehicle_id", vehicleIds)
+            }
+        }.decodeList<Trip>()
+    }
+
+    suspend fun getTripsByOwner(ownerId: String): List<Trip> {
+        // This requires a join or owner_id column in trips table. 
+        // If owner_id isn't in trips, we fetch vehicles then trips.
+        // Let's ensure the fallback in ViewModel is robust.
+        return emptyList()
+    }
 }

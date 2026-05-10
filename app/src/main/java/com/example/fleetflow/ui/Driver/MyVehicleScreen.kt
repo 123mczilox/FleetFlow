@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.DirectionsCar
@@ -31,8 +33,14 @@ fun MyVehicleScreen(
     viewModel: DriverViewModel = viewModel()
 ) {
     val vehicle by viewModel.assignedVehicle.collectAsState()
+    val maintenanceLogs by viewModel.maintenanceLogs.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val user = SupabaseClient.client.auth.currentUserOrNull()
+    val scrollState = rememberScrollState()
+
+    val lastService = maintenanceLogs.maxByOrNull { it.date }
+    val condition = if (maintenanceLogs.size > 5) "Requires Inspection" else "Good"
+    val reminders = if (maintenanceLogs.isEmpty()) "Initial Service Due" else "No immediate action"
 
     LaunchedEffect(user?.id) {
         user?.id?.let { viewModel.fetchAssignedVehicle(it) }
@@ -68,6 +76,7 @@ fun MyVehicleScreen(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(16.dp)
+                            .verticalScroll(scrollState)
                     ) {
                         // Vehicle Card Header
                         Card(
@@ -132,9 +141,9 @@ fun MyVehicleScreen(
                         // Info Grid
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             InfoRow(icon = Icons.Default.LocationOn, label = "Assigned Route", value = v.route ?: "Unassigned")
-                            InfoRow(icon = Icons.Default.Build, label = "Last Service", value = "12th Oct 2023")
-                            InfoRow(icon = Icons.Default.Speed, label = "Condition", value = "Good")
-                            InfoRow(icon = Icons.Default.NotificationsActive, label = "Reminders", value = "Oil Change Due")
+                            InfoRow(icon = Icons.Default.Build, label = "Last Service", value = lastService?.date ?: "No records")
+                            InfoRow(icon = Icons.Default.Speed, label = "Condition", value = condition)
+                            InfoRow(icon = Icons.Default.NotificationsActive, label = "Reminders", value = reminders)
                         }
                     }
                 } ?: Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

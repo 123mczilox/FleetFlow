@@ -11,6 +11,8 @@ import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.*
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
@@ -26,6 +28,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.fleetflow.Data.Model.Vehicle
 import com.example.fleetflow.Data.Service.AuthService
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OwnerDashboardScreen(
     ownerId: String,
@@ -44,7 +47,10 @@ fun OwnerDashboardScreen(
     val serviceDue by viewModel.serviceDue.collectAsState()
     val currentUser by viewModel.currentUser.collectAsState()
     val reports by viewModel.reports.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
     val pendingReports = reports.count { it.status == "pending" }
+    
+    val pullToRefreshState = rememberPullToRefreshState()
 
     LaunchedEffect(ownerId) {
         viewModel.fetchOwnerData(ownerId)
@@ -53,51 +59,58 @@ fun OwnerDashboardScreen(
     Scaffold(
         containerColor = Color(0xFFF8F9FA)
     ) { paddingValues ->
-        LazyColumn(
+        PullToRefreshBox(
+            isRefreshing = isLoading,
+            onRefresh = { viewModel.fetchOwnerData(ownerId) },
+            state = pullToRefreshState,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Header with Gradient
-            item {
-                HeaderSection(
-                    userName = currentUser?.full_name ?: "Loading...",
-                    onLogout = onLogout
-                )
-            }
+            LazyColumn(
+                modifier = Modifier.fillMaxSize()
+            ) {
+                // Header with Gradient
+                item {
+                    HeaderSection(
+                        userName = currentUser?.full_name ?: "Loading...",
+                        onLogout = onLogout
+                    )
+                }
 
-            // Stats Grid
-            item {
-                StatsGrid(
-                    totalVehicles = totalVehicles,
-                    todayRevenue = todayRevenue,
-                    activeTrips = activeTrips,
-                    serviceDue = serviceDue + pendingReports
-                )
-            }
+                // Stats Grid
+                item {
+                    StatsGrid(
+                        totalVehicles = totalVehicles,
+                        todayRevenue = todayRevenue,
+                        activeTrips = activeTrips,
+                        serviceDue = serviceDue + pendingReports
+                    )
+                }
 
-            // Quick Actions
-            item {
-                QuickActionsSection(
-                    onAddVehicle = onNavigateToVehicles,
-                    onTrips = onNavigateToTrips,
-                    onMaintenance = onNavigateToMaintenance,
-                    onReports = onNavigateToReports,
-                    onDrivers = { onNavigateToDrivers(ownerId) }
-                )
-            }
+                // Quick Actions
+                item {
+                    QuickActionsSection(
+                        onAddVehicle = onNavigateToVehicles,
+                        onTrips = onNavigateToTrips,
+                        onMaintenance = onNavigateToMaintenance,
+                        onReports = onNavigateToReports,
+                        onDrivers = { onNavigateToDrivers(ownerId) }
+                    )
+                }
 
-            // Fleet Overview
-            item {
-                Text(
-                    text = " Fleet Overview",
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                    modifier = Modifier.padding(16.dp)
-                )
-            }
+                // Fleet Overview
+                item {
+                    Text(
+                        text = " Fleet Overview",
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
 
-            items(vehicles) { vehicle ->
-                VehicleOverviewItem(vehicle)
+                items(vehicles) { vehicle ->
+                    VehicleOverviewItem(vehicle)
+                }
             }
         }
     }

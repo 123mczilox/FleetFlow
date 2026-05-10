@@ -11,6 +11,9 @@ import com.example.fleetflow.Data.Repository.VehicleRepository
 import com.example.fleetflow.Data.Service.ReportService
 import com.example.fleetflow.Data.Service.TripService
 import com.example.fleetflow.Data.Service.VehicleService
+import com.example.fleetflow.Data.Model.Maintenance
+import com.example.fleetflow.Data.Repository.MaintenanceRepository
+import com.example.fleetflow.Data.Service.MaintenanceService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -24,9 +27,13 @@ class DriverViewModel : ViewModel() {
     private val tripRepository = TripRepository(TripService())
     private val vehicleRepository = VehicleRepository(VehicleService())
     private val reportRepository = ReportRepository(ReportService())
+    private val maintenanceRepository = MaintenanceRepository(MaintenanceService())
 
     private val _assignedVehicle = MutableStateFlow<Vehicle?>(null)
     val assignedVehicle: StateFlow<Vehicle?> = _assignedVehicle
+
+    private val _maintenanceLogs = MutableStateFlow<List<Maintenance>>(emptyList())
+    val maintenanceLogs: StateFlow<List<Maintenance>> = _maintenanceLogs
 
     private val _trips = MutableStateFlow<List<Trip>>(emptyList())
     val trips: StateFlow<List<Trip>> = _trips
@@ -58,6 +65,7 @@ class DriverViewModel : ViewModel() {
                 vehicle?.let {
                     _trips.value = tripRepository.getTripsByVehicle(it.id)
                     _reports.value = reportRepository.getReportsByDriver(driverId)
+                    _maintenanceLogs.value = maintenanceRepository.getMaintenanceLogs(it.id)
                 }
                 _error.value = null
             } catch (e: Exception) {

@@ -33,4 +33,16 @@ class VehicleService {
             }
         }.decodeSingleOrNull<Vehicle>()
     }
+
+    suspend fun getAllVehicles(): List<Vehicle> {
+        return client.postgrest["vehicles"].select().decodeList<Vehicle>()
+    }
+
+    suspend fun clearDriverAssignment(driverId: String) {
+        val vehicle = getVehicleByDriver(driverId)
+        vehicle?.let {
+            val updated = it.copy(assigned_driver_id = null)
+            updateVehicle(updated)
+        }
+    }
 }

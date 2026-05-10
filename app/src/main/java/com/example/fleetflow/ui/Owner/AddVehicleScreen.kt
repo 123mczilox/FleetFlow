@@ -8,6 +8,9 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -27,15 +30,16 @@ fun AddVehicleScreen(
     onVehicleAdded: () -> Unit,
     viewModel: OwnerViewModel = viewModel()
 ) {
-    var plateNumber by remember { mutableStateOf("") }
-    var fleetNumber by remember { mutableStateOf("") }
-    var route by remember { mutableStateOf("Nairobi - Thika") }
+    var plateNumber by rememberSaveable { mutableStateOf("") }
+    var fleetNumber by rememberSaveable { mutableStateOf("") }
+    var route by rememberSaveable { mutableStateOf("Nairobi - Thika") }
     var isExpanded by remember { mutableStateOf(false) }
     val routes = listOf("Nairobi - Thika", "Nairobi - Nakuru", "Nairobi - Mombasa", "Nairobi - Kisumu")
 
     val user = SupabaseClient.client.auth.currentUserOrNull()
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.error.collectAsState()
+    val scrollState = rememberScrollState()
 
     Scaffold(
         topBar = {
@@ -60,6 +64,7 @@ fun AddVehicleScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+                .verticalScroll(scrollState)
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
