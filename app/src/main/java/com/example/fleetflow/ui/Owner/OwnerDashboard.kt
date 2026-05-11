@@ -28,6 +28,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.fleetflow.Data.Model.Vehicle
 import com.example.fleetflow.Data.Service.AuthService
 
+import java.util.Locale
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OwnerDashboardScreen(
@@ -48,6 +50,7 @@ fun OwnerDashboardScreen(
     val currentUser by viewModel.currentUser.collectAsState()
     val reports by viewModel.reports.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val error by viewModel.error.collectAsState()
     val pendingReports = reports.count { it.status == "pending" }
     
     val pullToRefreshState = rememberPullToRefreshState()
@@ -78,6 +81,24 @@ fun OwnerDashboardScreen(
                     )
                 }
 
+                // Error Message
+                if (error != null) {
+                    item {
+                        Surface(
+                            modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                            color = Color.Red.copy(alpha = 0.1f),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text(
+                                text = error!!,
+                                color = Color.Red,
+                                modifier = Modifier.padding(8.dp),
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+                }
+
                 // Stats Grid
                 item {
                     StatsGrid(
@@ -99,7 +120,7 @@ fun OwnerDashboardScreen(
                     )
                 }
 
-                // Fleet Overview
+                // Fleet Overview Header
                 item {
                     Text(
                         text = " Fleet Overview",
@@ -108,9 +129,47 @@ fun OwnerDashboardScreen(
                     )
                 }
 
-                items(vehicles) { vehicle ->
-                    VehicleOverviewItem(vehicle)
+                // Empty State for Vehicles
+                if (vehicles.isEmpty() && !isLoading) {
+                    item {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(32.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Surface(
+                                modifier = Modifier.size(64.dp),
+                                shape = RoundedCornerShape(16.dp),
+                                color = Color.Gray.copy(alpha = 0.05f)
+                            ) {
+                                Icon(
+                                    Icons.Default.DirectionsCar, 
+                                    contentDescription = null, 
+                                    tint = Color.Gray.copy(alpha = 0.5f), 
+                                    modifier = Modifier.padding(16.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text("No vehicles registered yet", fontWeight = FontWeight.SemiBold, color = Color.DarkGray)
+                            Text("Add your first vehicle to start tracking", fontSize = 12.sp, color = Color.Gray)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Button(
+                                onClick = onNavigateToVehicles,
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8E2DE2))
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Add Vehicle")
+                            }
+                        }
+                    }
+                } else {
+                    items(vehicles) { vehicle ->
+                        VehicleOverviewItem(vehicle)
+                    }
                 }
+                
+                item { Spacer(modifier = Modifier.height(80.dp)) }
             }
         }
     }
@@ -216,7 +275,7 @@ fun StatsGrid(
             Spacer(modifier = Modifier.width(16.dp))
             StatCard(
                 title = "Today's Revenue",
-                value = "${todayRevenue / 1000}K",
+                value = "KES ${String.format(Locale.getDefault(), "%.1f", todayRevenue / 1000)}K",
                 icon = Icons.AutoMirrored.Filled.TrendingUp,
                 iconColor = Color(0xFF00B894),
                 modifier = Modifier.weight(1f)
@@ -265,7 +324,7 @@ fun StatCard(
                 Text(text = title, fontSize = 12.sp, color = Color.Gray)
                 Text(
                     text = value,
-                    fontSize = 24.sp,
+                    fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = iconColor
                 )
@@ -342,6 +401,7 @@ fun QuickActionButton(label: String, icon: ImageVector, color: Color, onClick: (
 
 @Composable
 fun VehicleOverviewItem(vehicle: Vehicle) {
+    val status = vehicle.status ?: "active" // Fallback if status is null
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -373,12 +433,12 @@ fun VehicleOverviewItem(vehicle: Vehicle) {
             }
             Surface(
                 shape = RoundedCornerShape(16.dp),
-                color = Color(0xFF00B894).copy(alpha = 0.1f),
+                color = (if(status == "active") Color(0xFF00B894) else Color.Gray).copy(alpha = 0.1f),
                 modifier = Modifier.padding(start = 8.dp)
             ) {
                 Text(
-                    text = "Active",
-                    color = Color(0xFF00B894),
+                    text = status.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() },
+                    color = if(status == "active") Color(0xFF00B894) else Color.Gray,
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)

@@ -26,17 +26,17 @@ import io.github.jan.supabase.auth.auth
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecordTripScreen(
+    driverId: String,
     onTripRecorded: () -> Unit,
     viewModel: DriverViewModel = viewModel()
 ) {
     var tripsCount by rememberSaveable { mutableStateOf("") }
     var revenue by rememberSaveable { mutableStateOf("") }
-    val user = SupabaseClient.client.auth.currentUserOrNull()
     val assignedVehicle by viewModel.assignedVehicle.collectAsState()
     val scrollState = rememberScrollState()
 
-    LaunchedEffect(Unit) {
-        user?.let { viewModel.fetchAssignedVehicle(it.id) }
+    LaunchedEffect(driverId) {
+        viewModel.fetchAssignedVehicle(driverId)
     }
 
     Scaffold(
@@ -135,17 +135,9 @@ fun RecordTripScreen(
 
             Button(
                 onClick = {
-                    val user_id = user?.id
-                    val vehicle_id = assignedVehicle?.id
-                    if (user_id != null && vehicle_id != null) {
-                        val trip = Trip(
-                            vehicle_id = vehicle_id,
-                            driver_id = user_id,
-                            trips_count = tripsCount.toIntOrNull() ?: 0,
-                            revenue = revenue.toDoubleOrNull() ?: 0.0
-                        )
-                        viewModel.recordTrip(trip, onTripRecorded)
-                    }
+                    val count = tripsCount.toIntOrNull() ?: 0
+                    val rev = revenue.toDoubleOrNull() ?: 0.0
+                    viewModel.recordTrip(count, rev, onTripRecorded)
                 },
                 modifier = Modifier
                     .fillMaxWidth()

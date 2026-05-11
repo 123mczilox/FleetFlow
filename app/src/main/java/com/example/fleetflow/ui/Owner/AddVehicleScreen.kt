@@ -27,6 +27,7 @@ import java.util.UUID
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddVehicleScreen(
+    ownerId: String,
     onVehicleAdded: () -> Unit,
     viewModel: OwnerViewModel = viewModel()
 ) {
@@ -36,7 +37,6 @@ fun AddVehicleScreen(
     var isExpanded by remember { mutableStateOf(false) }
     val routes = listOf("Nairobi - Thika", "Nairobi - Nakuru", "Nairobi - Mombasa", "Nairobi - Kisumu")
 
-    val user = SupabaseClient.client.auth.currentUserOrNull()
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.error.collectAsState()
     val scrollState = rememberScrollState()
@@ -68,6 +68,7 @@ fun AddVehicleScreen(
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // ... (Card content remains the same)
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
@@ -128,26 +129,23 @@ fun AddVehicleScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.height(24.dp))
 
             if (isLoading) {
                 CircularProgressIndicator(color = Color(0xFF8E2DE2))
             } else {
                 Button(
                     onClick = {
-                        val userId = user?.id
-                        if (userId != null) {
-                            val vehicle = Vehicle(
-                                id = UUID.randomUUID().toString(),
-                                plate_number = plateNumber,
-                                fleet_number = fleetNumber,
-                                route = route,
-                                owner_id = userId,
-                                assigned_driver_id = null
-                            )
-                            viewModel.addVehicle(vehicle)
-                            onVehicleAdded()
-                        }
+                        val vehicle = Vehicle(
+                            id = UUID.randomUUID().toString(),
+                            plate_number = plateNumber,
+                            fleet_number = fleetNumber,
+                            route = route,
+                            owner_id = ownerId,
+                            assigned_driver_id = null
+                        )
+                        viewModel.addVehicle(vehicle)
+                        onVehicleAdded()
                     },
                     modifier = Modifier
                         .fillMaxWidth()

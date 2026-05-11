@@ -22,14 +22,14 @@ import io.github.jan.supabase.auth.auth
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReportsListScreen(
+    ownerId: String,
     viewModel: OwnerViewModel = viewModel()
 ) {
     val reports by viewModel.reports.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
-    val user = SupabaseClient.client.auth.currentUserOrNull()
 
-    LaunchedEffect(Unit) {
-        user?.id?.let { viewModel.fetchOwnerData(it) }
+    LaunchedEffect(ownerId) {
+        viewModel.fetchOwnerData(ownerId)
     }
 
     Scaffold(

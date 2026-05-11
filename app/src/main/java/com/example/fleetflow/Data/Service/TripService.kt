@@ -35,9 +35,10 @@ class TripService {
     }
 
     suspend fun getTripsByOwner(ownerId: String): List<Trip> {
-        // This requires a join or owner_id column in trips table. 
-        // If owner_id isn't in trips, we fetch vehicles then trips.
-        // Let's ensure the fallback in ViewModel is robust.
-        return emptyList()
+        return client.postgrest["trips"].select {
+            filter {
+                eq("owner_id", ownerId)
+            }
+        }.decodeList<Trip>()
     }
 }

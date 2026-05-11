@@ -24,19 +24,19 @@ import io.github.jan.supabase.auth.auth
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReportScreen(
+    driverId: String,
     onReportSubmitted: () -> Unit,
     viewModel: DriverViewModel = viewModel()
 ) {
     var title by rememberSaveable { mutableStateOf("") }
     var description by rememberSaveable { mutableStateOf("") }
-    val user = SupabaseClient.client.auth.currentUserOrNull()
     val assignedVehicle by viewModel.assignedVehicle.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.error.collectAsState()
     val scrollState = rememberScrollState()
 
-    LaunchedEffect(Unit) {
-        user?.let { viewModel.fetchAssignedVehicle(it.id) }
+    LaunchedEffect(driverId) {
+        viewModel.fetchAssignedVehicle(driverId)
     }
 
     Scaffold(
@@ -102,18 +102,7 @@ fun ReportScreen(
 
             Button(
                 onClick = {
-                    val user_id = user?.id
-                    val vehicle = assignedVehicle
-                    if (user_id != null && vehicle != null) {
-                        val report = Report(
-                            driver_id = user_id,
-                            vehicle_id = vehicle.id,
-                            owner_id = vehicle.owner_id,
-                            title = title,
-                            description = description
-                        )
-                        viewModel.submitReport(report, onReportSubmitted)
-                    }
+                    viewModel.submitReport(title, description, onReportSubmitted)
                 },
                 modifier = Modifier
                     .fillMaxWidth()

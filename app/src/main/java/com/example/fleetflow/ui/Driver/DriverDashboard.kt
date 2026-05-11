@@ -30,9 +30,9 @@ import io.github.jan.supabase.auth.auth
 @Composable
 fun DriverDashboardScreen(
     driverId: String,
-    onNavigateToRecordTrip: () -> Unit,
-    onNavigateToMyVehicle: () -> Unit,
-    onNavigateToReport: () -> Unit,
+    onNavigateToRecordTrip: (String) -> Unit,
+    onNavigateToMyVehicle: (String) -> Unit,
+    onNavigateToReport: (String) -> Unit,
     onLogout: () -> Unit,
     viewModel: DriverViewModel = viewModel()
 ) {
@@ -41,7 +41,7 @@ fun DriverDashboardScreen(
     val totalRevenue by viewModel.totalRevenue.collectAsState()
     val todayRevenue by viewModel.todayRevenue.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
-    val user = SupabaseClient.client.auth.currentUserOrNull()
+    // We'll use the driverId passed from navigation instead of relying on auth client state
     
     val pullToRefreshState = rememberPullToRefreshState()
 
@@ -66,7 +66,7 @@ fun DriverDashboardScreen(
                 // Header
                 item {
                     DriverHeaderSection(
-                        userName = user?.userMetadata?.get("full_name")?.toString() ?: "Driver",
+                        userName = assignedVehicle?.assigned_driver_id ?: "Driver", // Or better, fetch driver name from VM
                         onLogout = onLogout
                     )
                 }
@@ -124,7 +124,7 @@ fun DriverDashboardScreen(
 
                 // My Assigned Vehicle
                 item {
-                    AssignedVehicleCard(assignedVehicle, onNavigateToMyVehicle)
+                    AssignedVehicleCard(assignedVehicle) { onNavigateToMyVehicle(driverId) }
                 }
 
                 // Record New Trip Button
@@ -136,7 +136,7 @@ fun DriverDashboardScreen(
                             .padding(horizontal = 16.dp)
                     ) {
                         Button(
-                            onClick = onNavigateToRecordTrip,
+                            onClick = { onNavigateToRecordTrip(driverId) },
                             modifier = Modifier
                                 .weight(1f)
                                 .height(56.dp),
@@ -151,7 +151,7 @@ fun DriverDashboardScreen(
                         }
                         Spacer(modifier = Modifier.width(12.dp))
                         Button(
-                            onClick = onNavigateToReport,
+                            onClick = { onNavigateToReport(driverId) },
                             modifier = Modifier
                                 .weight(1f)
                                 .height(56.dp),

@@ -8,6 +8,7 @@ import java.util.UUID
 data class Maintenance(
     val id: String = UUID.randomUUID().toString(),
     val vehicle_id: String,
+    val owner_id: String,
     val service_type: String,
     val cost: Double,
     val description: String? = null,

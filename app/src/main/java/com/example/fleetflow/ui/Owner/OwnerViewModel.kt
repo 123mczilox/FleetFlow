@@ -1,5 +1,6 @@
 package com.example.fleetflow.ui.Owner
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.fleetflow.Data.Model.Report
@@ -18,14 +19,19 @@ import com.example.fleetflow.Data.Repository.DriverRepository
 import com.example.fleetflow.Data.Service.DriverService
 import com.example.fleetflow.Data.Model.User
 import com.example.fleetflow.Data.Service.AuthService
+import com.example.fleetflow.Data.Service.SupabaseClient
+import io.github.jan.supabase.realtime.PostgresAction
+import io.github.jan.supabase.realtime.channel
+import io.github.jan.supabase.realtime.postgresChangeFlow
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.time.LocalDate
 
 class OwnerViewModel : ViewModel() {
     private val vehicleRepository = VehicleRepository(VehicleService())
@@ -66,12 +72,18 @@ class OwnerViewModel : ViewModel() {
     val totalVehicles = _vehicles.map { it.size }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(), 0)
     
     val todayRevenue = _trips.map { tripList ->
-        val today = LocalDate.now().toString()
-        tripList.filter { it.created_at?.startsWith(today) == true }.sumOf { it.revenue }
+        try {
+            // Safer date check that doesn't rely solely on LocalDate
+            val todayPrefix = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
+            tripList.filter { it.created_at?.startsWith(todayPrefix) == true }.sumOf { it.revenue }
+        } catch (e: Exception) {
+            Log.e("OwnerViewModel", "Error calculating revenue", e)
+            0.0
+        }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(), 0.0)
 
     val activeTrips = _trips.map { tripList ->
-        tripList.filter { !it.is_locked }.size
+        tripList.count { !it.is_locked }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(), 0)
 
     val serviceDue = _maintenanceLogs.map { it.size }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(), 0)
@@ -79,41 +91,58 @@ class OwnerViewModel : ViewModel() {
     fun fetchOwnerData(ownerId: String) {
         viewModelScope.launch {
             _isLoading.value = true
+            Log.d("OwnerViewModel", "Fetching owner data for ID: $ownerId")
             try {
                 // Fetch profile first
-                _currentUser.value = authService.getUserProfile(ownerId)
+                val profile = authService.getUserProfile(ownerId)
+                _currentUser.value = profile
+                Log.d("OwnerViewModel", "Profile fetched: ${profile.email}, Role: ${profile.role}")
 
-                // Fetch vehicles belonging to this owner
-                val fetchedVehicles = vehicleRepository.getVehiclesByOwner(ownerId)
-                _vehicles.value = fetchedVehicles
-                
-                // Fetch all drivers and all vehicles (for global assignment status)
-                val driversList = try { driverRepository.getAllDrivers() } catch (e: Exception) { emptyList() }
-                _drivers.value = driversList
-                
-                val allVehList = try { vehicleRepository.getAllVehicles() } catch (e: Exception) { emptyList() }
-                _allVehicles.value = allVehList
-
-                if (fetchedVehicles.isNotEmpty()) {
-                    val vehicleIds = fetchedVehicles.map { it.id }
-
-                    val tripsJob = async { 
-                        try { tripRepository.getTripsByVehicles(vehicleIds) } catch (e: Exception) { emptyList() }
-                    }
-                    val maintenanceJob = async { 
-                        try { maintenanceRepository.getMaintenanceByVehicles(vehicleIds) } catch (e: Exception) { emptyList() }
-                    }
-                    val reportsJob = async { 
-                        try { reportRepository.getReportsByOwner(ownerId) } catch (e: Exception) { emptyList() }
-                    }
-
-                    _trips.value = tripsJob.await()
-                    _maintenanceLogs.value = maintenanceJob.await().sortedByDescending { it.date }
-                    _reports.value = reportsJob.await()
+                // Fetch data belonging to this owner
+                val vehiclesJob = async { 
+                    Log.d("OwnerViewModel", "Fetching vehicles...")
+                    vehicleRepository.getVehiclesByOwner(ownerId) 
+                }
+                val tripsJob = async { 
+                    Log.d("OwnerViewModel", "Fetching trips...")
+                    tripRepository.getTripsByOwner(ownerId) 
+                }
+                val maintenanceJob = async { 
+                    Log.d("OwnerViewModel", "Fetching maintenance...")
+                    maintenanceRepository.getMaintenanceByOwner(ownerId) 
+                }
+                val reportsJob = async { 
+                    Log.d("OwnerViewModel", "Fetching reports...")
+                    reportRepository.getReportsByOwner(ownerId) 
+                }
+                val driversJob = async { 
+                    Log.d("OwnerViewModel", "Fetching drivers...")
+                    try { 
+                        driverRepository.getAllDrivers() 
+                    } catch (e: Exception) { 
+                        Log.e("OwnerViewModel", "Error fetching drivers", e)
+                        emptyList() 
+                    } 
                 }
 
+                val vehicles = vehiclesJob.await()
+                val trips = tripsJob.await()
+                val maintenance = maintenanceJob.await()
+                val reports = reportsJob.await()
+                val drivers = driversJob.await()
+
+                Log.d("OwnerViewModel", "Data received - Vehicles: ${vehicles.size}, Trips: ${trips.size}, Maintenance: ${maintenance.size}, Reports: ${reports.size}, Drivers: ${drivers.size}")
+
+                _vehicles.value = vehicles
+                _trips.value = trips
+                _maintenanceLogs.value = maintenance.sortedByDescending { it.date }
+                _reports.value = reports
+                _drivers.value = drivers
+
                 _error.value = null
+                
             } catch (e: Exception) {
+                Log.e("OwnerViewModel", "Error fetching dashboard data", e)
                 _error.value = "Error fetching dashboard: ${e.message}"
             } finally {
                 _isLoading.value = false
@@ -121,17 +150,86 @@ class OwnerViewModel : ViewModel() {
         }
     }
 
-    fun fetchVehicles(ownerId: String) {
+    private var isRealtimeSetup = false
+    
+    fun fetchManagementData(ownerId: String) {
+        fetchOwnerData(ownerId)
+        if (!isRealtimeSetup) {
+            setupRealtimeUpdates(ownerId)
+            isRealtimeSetup = true
+        }
+    }
+
+    fun fetchAvailableDrivers() {
+        viewModelScope.launch {
+            try {
+                _drivers.value = driverRepository.getAllDrivers()
+            } catch (e: Exception) {
+                _error.value = "Error fetching drivers: ${e.message}"
+            }
+        }
+    }
+
+    fun fetchAllTrips(ownerId: String) {
+        viewModelScope.launch {
+            try {
+                _trips.value = tripRepository.getTripsByOwner(ownerId)
+            } catch (e: Exception) {
+                _error.value = "Error fetching trips: ${e.message}"
+            }
+        }
+    }
+
+    fun assignDriverToVehicle(vehicleId: String, driverId: String, ownerId: String) {
         viewModelScope.launch {
             _isLoading.value = true
             try {
-                _vehicles.value = vehicleRepository.getVehiclesByOwner(ownerId)
+                val vehicle = _vehicles.value.find { it.id == vehicleId }
+                if (vehicle != null) {
+                    val updatedVehicle = vehicle.copy(assigned_driver_id = driverId)
+                    vehicleRepository.updateVehicle(updatedVehicle)
+                    fetchOwnerData(ownerId)
+                }
                 _error.value = null
             } catch (e: Exception) {
-                _error.value = "Error fetching vehicles: ${e.message}"
+                _error.value = "Error assigning driver: ${e.message}"
             } finally {
                 _isLoading.value = false
             }
+        }
+    }
+
+    private fun setupRealtimeUpdates(ownerId: String) {
+        try {
+            Log.d("OwnerViewModel", "Setting up realtime updates for owner: $ownerId")
+            val channel = SupabaseClient.client.channel("owner_dashboard_$ownerId")
+            
+            // Listen for changes in trips
+            channel.postgresChangeFlow<PostgresAction>(schema = "public") {
+                table = "trips"
+            }.onEach { action ->
+                Log.d("OwnerViewModel", "Realtime update: trips changed")
+                fetchOwnerData(ownerId) 
+            }.launchIn(viewModelScope)
+
+            // Listen for changes in reports
+            channel.postgresChangeFlow<PostgresAction>(schema = "public") {
+                table = "reports"
+            }.onEach { action ->
+                Log.d("OwnerViewModel", "Realtime update: reports changed")
+                fetchOwnerData(ownerId)
+            }.launchIn(viewModelScope)
+
+            viewModelScope.launch {
+                try {
+                    channel.subscribe()
+                    Log.d("OwnerViewModel", "Subscribed to realtime channel")
+                } catch (e: Exception) {
+                    Log.e("OwnerViewModel", "Realtime subscription failed - Check Supabase publication settings", e)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("OwnerViewModel", "SetupRealtimeUpdates Error: ${e.message}")
         }
     }
 
@@ -150,106 +248,20 @@ class OwnerViewModel : ViewModel() {
         }
     }
 
-    fun fetchManagementData(ownerId: String) {
-        viewModelScope.launch {
-            _isLoading.value = true
-            try {
-                // Fetch in parallel
-                val driversJob = async { driverRepository.getAllDrivers() }
-                val ownerVehiclesJob = async { vehicleRepository.getVehiclesByOwner(ownerId) }
-                val allVehiclesJob = async { vehicleRepository.getAllVehicles() }
-                
-                _drivers.value = driversJob.await()
-                _vehicles.value = ownerVehiclesJob.await()
-                _allVehicles.value = allVehiclesJob.await()
-                
-                _error.value = null
-            } catch (e: Exception) {
-                _error.value = "Failed to load management data: ${e.message}"
-            } finally {
-                _isLoading.value = false
-            }
-        }
-    }
-
-    fun fetchAvailableDrivers() {
-        viewModelScope.launch {
-            _isLoading.value = true
-            try {
-                _drivers.value = driverRepository.getAllDrivers()
-                _error.value = null
-            } catch (e: Exception) {
-                _error.value = "Error fetching drivers: ${e.message}"
-            } finally {
-                _isLoading.value = false
-            }
-        }
-    }
-
-    fun assignDriverToVehicle(vehicle: Vehicle, driverId: String) {
-        assignDriverWithTarget(vehicle, driverId, vehicle.daily_target)
-    }
-
     fun assignDriverWithTarget(vehicle: Vehicle, driverId: String, dailyTarget: Double) {
         viewModelScope.launch {
             _isLoading.value = true
             try {
-                // 1. Clear any previous assignment for this driver from ANY vehicle in the system
                 vehicleRepository.clearDriverAssignment(driverId)
-                
-                // 2. Assign to the new vehicle
                 val updatedVehicle = vehicle.copy(
                     assigned_driver_id = driverId,
                     daily_target = dailyTarget
                 )
                 vehicleRepository.updateVehicle(updatedVehicle)
-                
-                // 3. Refresh all owner data to ensure consistency
                 fetchOwnerData(vehicle.owner_id)
                 _error.value = null
             } catch (e: Exception) {
                 _error.value = "Error assigning driver: ${e.message}"
-            } finally {
-                _isLoading.value = false
-            }
-        }
-    }
-
-    fun fetchAllTrips(ownerId: String) {
-        viewModelScope.launch {
-            _isLoading.value = true
-            try {
-                val ownerVehicles = vehicleRepository.getVehiclesByOwner(ownerId)
-                if (ownerVehicles.isNotEmpty()) {
-                    val vehicleIds = ownerVehicles.map { it.id }
-                    _trips.value = tripRepository.getTripsByVehicles(vehicleIds)
-                } else {
-                    _trips.value = emptyList()
-                }
-                _error.value = null
-            } catch (e: Exception) {
-                _error.value = "Error fetching trips: ${e.message}"
-            } finally {
-                _isLoading.value = false
-            }
-        }
-    }
-
-    fun fetchMaintenanceLogs(ownerId: String) {
-        viewModelScope.launch {
-            _isLoading.value = true
-            try {
-                val ownerVehicles = vehicleRepository.getVehiclesByOwner(ownerId)
-                if (ownerVehicles.isNotEmpty()) {
-                    val vehicleIds = ownerVehicles.map { it.id }
-                    val allLogs = maintenanceRepository.getMaintenanceByVehicles(vehicleIds)
-                    _maintenanceLogs.value = allLogs.sortedByDescending { it.date }
-                } else {
-                    _maintenanceLogs.value = emptyList()
-                }
-                _error.value = null
-            } catch (e: Exception) {
-                _error.value = "Error fetching maintenance: ${e.message}"
             } finally {
                 _isLoading.value = false
             }
@@ -261,10 +273,10 @@ class OwnerViewModel : ViewModel() {
             _isLoading.value = true
             try {
                 maintenanceRepository.addMaintenanceLog(log)
-                fetchMaintenanceLogs(ownerId)
+                fetchOwnerData(ownerId)
                 _error.value = null
             } catch (e: Exception) {
-                _error.value = "Failed to add maintenance log: ${e.message}"
+                _error.value = e.message ?: "Failed to add maintenance log"
             } finally {
                 _isLoading.value = false
             }

@@ -60,13 +60,21 @@ fun AppNavigation() {
         composable(Screen.Login.route) {
             LoginScreen(
                 onLoginSuccess = { user ->
-                    if (user.role == "owner") {
-                        navController.navigate(Screen.OwnerDashboard.route + "/${user.id}") {
-                            popUpTo(Screen.Login.route) { inclusive = true }
+                    android.util.Log.d("FleetFlowAuth", "Login success: ${user.email}, role: ${user.role}")
+                    val role = user.role.lowercase()
+                    when (role) {
+                        "owner" -> {
+                            navController.navigate(Screen.OwnerDashboard.route + "/${user.id}") {
+                                popUpTo(Screen.Login.route) { inclusive = true }
+                            }
                         }
-                    } else {
-                        navController.navigate(Screen.DriverDashboard.route + "/${user.id}") {
-                            popUpTo(Screen.Login.route) { inclusive = true }
+                        "driver" -> {
+                            navController.navigate(Screen.DriverDashboard.route + "/${user.id}") {
+                                popUpTo(Screen.Login.route) { inclusive = true }
+                            }
+                        }
+                        else -> {
+                            android.util.Log.e("FleetFlowAuth", "Unknown role: ${user.role}")
                         }
                     }
                 },
@@ -79,13 +87,21 @@ fun AppNavigation() {
         composable(Screen.Register.route) {
             RegisterScreen(
                 onRegisterSuccess = { user ->
-                    if (user.role == "owner") {
-                        navController.navigate(Screen.OwnerDashboard.route + "/${user.id}") {
-                            popUpTo(Screen.Register.route) { inclusive = true }
+                    android.util.Log.d("FleetFlowAuth", "Register success: ${user.email}, role: ${user.role}")
+                    val role = user.role.lowercase()
+                    when (role) {
+                        "owner" -> {
+                            navController.navigate(Screen.OwnerDashboard.route + "/${user.id}") {
+                                popUpTo(Screen.Register.route) { inclusive = true }
+                            }
                         }
-                    } else {
-                        navController.navigate(Screen.DriverDashboard.route + "/${user.id}") {
-                            popUpTo(Screen.Register.route) { inclusive = true }
+                        "driver" -> {
+                            navController.navigate(Screen.DriverDashboard.route + "/${user.id}") {
+                                popUpTo(Screen.Register.route) { inclusive = true }
+                            }
+                        }
+                        else -> {
+                            android.util.Log.e("FleetFlowAuth", "Unknown role: ${user.role}")
                         }
                     }
                 },
@@ -99,10 +115,10 @@ fun AppNavigation() {
             val ownerId = backStackEntry.arguments?.getString("ownerId") ?: ""
             OwnerDashboardScreen(
                 ownerId = ownerId,
-                onNavigateToVehicles = { navController.navigate(Screen.Vehicles.route) },
-                onNavigateToTrips = { navController.navigate(Screen.TripOverview.route) },
-                onNavigateToMaintenance = { navController.navigate(Screen.Maintenance.route) },
-                onNavigateToReports = { navController.navigate(Screen.Reports.route) },
+                onNavigateToVehicles = { navController.navigate(Screen.Vehicles.route + "/$ownerId") },
+                onNavigateToTrips = { navController.navigate(Screen.TripOverview.route + "/$ownerId") },
+                onNavigateToMaintenance = { navController.navigate(Screen.Maintenance.route + "/$ownerId") },
+                onNavigateToReports = { navController.navigate(Screen.Reports.route + "/$ownerId") },
                 onNavigateToDrivers = { id -> navController.navigate(Screen.Drivers.route + "/$id") },
                 onLogout = {
                     navController.navigate(Screen.Login.route) {
@@ -111,24 +127,31 @@ fun AppNavigation() {
                 }
             )
         }
-        composable(Screen.Vehicles.route) {
+        composable(Screen.Vehicles.route + "/{ownerId}") { backStackEntry ->
+            val ownerId = backStackEntry.arguments?.getString("ownerId") ?: ""
             VehicleScreen(
-                onNavigateToAddVehicle = { navController.navigate(Screen.AddVehicle.route) }
+                ownerId = ownerId,
+                onNavigateToAddVehicle = { navController.navigate(Screen.AddVehicle.route + "/$ownerId") }
             )
         }
-        composable(Screen.AddVehicle.route) {
+        composable(Screen.AddVehicle.route + "/{ownerId}") { backStackEntry ->
+            val ownerId = backStackEntry.arguments?.getString("ownerId") ?: ""
             AddVehicleScreen(
+                ownerId = ownerId,
                 onVehicleAdded = { navController.popBackStack() }
             )
         }
-        composable(Screen.TripOverview.route) {
-            TripOverviewScreen()
+        composable(Screen.TripOverview.route + "/{ownerId}") { backStackEntry ->
+            val ownerId = backStackEntry.arguments?.getString("ownerId") ?: ""
+            TripOverviewScreen(ownerId = ownerId)
         }
-        composable(Screen.Maintenance.route) {
-            MaintenanceScreen()
+        composable(Screen.Maintenance.route + "/{ownerId}") { backStackEntry ->
+            val ownerId = backStackEntry.arguments?.getString("ownerId") ?: ""
+            MaintenanceScreen(ownerId = ownerId)
         }
-        composable(Screen.Reports.route) {
-            ReportsListScreen()
+        composable(Screen.Reports.route + "/{ownerId}") { backStackEntry ->
+            val ownerId = backStackEntry.arguments?.getString("ownerId") ?: ""
+            ReportsListScreen(ownerId = ownerId)
         }
 
         // Driver Section
@@ -136,9 +159,9 @@ fun AppNavigation() {
             val driverId = backStackEntry.arguments?.getString("driverId") ?: ""
             DriverDashboardScreen(
                 driverId = driverId,
-                onNavigateToRecordTrip = { navController.navigate(Screen.RecordTrip.route) },
-                onNavigateToMyVehicle = { navController.navigate(Screen.MyVehicle.route) },
-                onNavigateToReport = { navController.navigate(Screen.MakeReport.route) },
+                onNavigateToRecordTrip = { id -> navController.navigate(Screen.RecordTrip.route + "/$id") },
+                onNavigateToMyVehicle = { id -> navController.navigate(Screen.MyVehicle.route + "/$id") },
+                onNavigateToReport = { id -> navController.navigate(Screen.MakeReport.route + "/$id") },
                 onLogout = {
                     navController.navigate(Screen.Login.route) {
                         popUpTo(0) { inclusive = true }
@@ -146,18 +169,23 @@ fun AppNavigation() {
                 }
             )
         }
-        composable(Screen.RecordTrip.route) {
+        composable(Screen.RecordTrip.route + "/{driverId}") { backStackEntry ->
+            val driverId = backStackEntry.arguments?.getString("driverId") ?: ""
             RecordTripScreen(
+                driverId = driverId,
                 onTripRecorded = { navController.popBackStack() }
             )
         }
-        composable(Screen.MakeReport.route) {
+        composable(Screen.MakeReport.route + "/{driverId}") { backStackEntry ->
+            val driverId = backStackEntry.arguments?.getString("driverId") ?: ""
             ReportScreen(
+                driverId = driverId,
                 onReportSubmitted = { navController.popBackStack() }
             )
         }
-        composable(Screen.MyVehicle.route) {
-            MyVehicleScreen()
+        composable(Screen.MyVehicle.route + "/{driverId}") { backStackEntry ->
+            val driverId = backStackEntry.arguments?.getString("driverId") ?: ""
+            MyVehicleScreen(driverId = driverId)
         }
         composable(Screen.Drivers.route + "/{ownerId}") { backStackEntry ->
             val ownerId = backStackEntry.arguments?.getString("ownerId") ?: ""

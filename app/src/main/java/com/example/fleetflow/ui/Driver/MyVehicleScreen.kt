@@ -30,20 +30,20 @@ import io.github.jan.supabase.auth.auth
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MyVehicleScreen(
+    driverId: String,
     viewModel: DriverViewModel = viewModel()
 ) {
     val vehicle by viewModel.assignedVehicle.collectAsState()
     val maintenanceLogs by viewModel.maintenanceLogs.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
-    val user = SupabaseClient.client.auth.currentUserOrNull()
     val scrollState = rememberScrollState()
 
     val lastService = maintenanceLogs.maxByOrNull { it.date }
     val condition = if (maintenanceLogs.size > 5) "Requires Inspection" else "Good"
     val reminders = if (maintenanceLogs.isEmpty()) "Initial Service Due" else "No immediate action"
 
-    LaunchedEffect(user?.id) {
-        user?.id?.let { viewModel.fetchAssignedVehicle(it) }
+    LaunchedEffect(driverId) {
+        viewModel.fetchAssignedVehicle(driverId)
     }
 
     Scaffold(

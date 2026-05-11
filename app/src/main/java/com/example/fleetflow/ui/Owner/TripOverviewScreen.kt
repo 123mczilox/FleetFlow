@@ -29,14 +29,14 @@ import io.github.jan.supabase.auth.auth
 
 @Composable
 fun TripOverviewScreen(
+    ownerId: String,
     viewModel: OwnerViewModel = viewModel()
 ) {
     val trips by viewModel.trips.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
-    val user = SupabaseClient.client.auth.currentUserOrNull()
 
-    LaunchedEffect(user?.id) {
-        user?.id?.let { viewModel.fetchAllTrips(it) }
+    LaunchedEffect(ownerId) {
+        viewModel.fetchAllTrips(ownerId)
     }
 
     Scaffold { paddingValues ->

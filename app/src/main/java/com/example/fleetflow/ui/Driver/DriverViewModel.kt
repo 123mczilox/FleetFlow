@@ -21,7 +21,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import java.time.LocalDate
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class DriverViewModel : ViewModel() {
     private val tripRepository = TripRepository(TripService())
@@ -46,8 +48,12 @@ class DriverViewModel : ViewModel() {
     val totalRevenue = _trips.map { it.sumOf { trip -> trip.revenue } }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(), 0.0)
 
     val todayRevenue = _trips.map { tripList ->
-        val today = LocalDate.now().toString()
-        tripList.filter { it.created_at?.startsWith(today) == true }.sumOf { it.revenue }
+        try {
+            val today = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+            tripList.filter { it.created_at?.startsWith(today) == true }.sumOf { it.revenue }
+        } catch (e: Exception) {
+            0.0
+        }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(), 0.0)
 
     private val _isLoading = MutableStateFlow(false)
@@ -76,11 +82,25 @@ class DriverViewModel : ViewModel() {
         }
     }
 
-    fun recordTrip(trip: Trip, onSuccess: () -> Unit) {
+    fun recordTrip(tripsCount: Int, revenue: Double, onSuccess: () -> Unit) {
+        val vehicle = _assignedVehicle.value
+        if (vehicle == null) {
+            _error.value = "No vehicle assigned to you."
+            return
+        }
+
         viewModelScope.launch {
             _isLoading.value = true
             try {
+                val trip = Trip(
+                    vehicle_id = vehicle.id,
+                    driver_id = vehicle.assigned_driver_id ?: "",
+                    owner_id = vehicle.owner_id,
+                    trips_count = tripsCount,
+                    revenue = revenue
+                )
                 tripRepository.recordTrip(trip)
+                fetchAssignedVehicle(vehicle.assigned_driver_id ?: "")
                 _error.value = null
                 onSuccess()
             } catch (e: Exception) {
@@ -91,11 +111,25 @@ class DriverViewModel : ViewModel() {
         }
     }
 
-    fun submitReport(report: Report, onSuccess: () -> Unit) {
+    fun submitReport(title: String, description: String, onSuccess: () -> Unit) {
+        val vehicle = _assignedVehicle.value
+        if (vehicle == null) {
+            _error.value = "No vehicle assigned to you."
+            return
+        }
+
         viewModelScope.launch {
             _isLoading.value = true
             try {
+                val report = Report(
+                    driver_id = vehicle.assigned_driver_id ?: "",
+                    vehicle_id = vehicle.id,
+                    owner_id = vehicle.owner_id,
+                    title = title,
+                    description = description
+                )
                 reportRepository.createReport(report)
+                fetchAssignedVehicle(vehicle.assigned_driver_id ?: "")
                 _error.value = null
                 onSuccess()
             } catch (e: Exception) {

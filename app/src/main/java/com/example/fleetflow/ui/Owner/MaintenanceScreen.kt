@@ -25,22 +25,24 @@ import com.example.fleetflow.Data.Model.Maintenance
 import com.example.fleetflow.Data.Model.Vehicle
 import com.example.fleetflow.Data.Service.SupabaseClient
 import io.github.jan.supabase.auth.auth
-import java.time.LocalDate
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MaintenanceScreen(
+    ownerId: String,
     viewModel: OwnerViewModel = viewModel()
 ) {
     val logs by viewModel.maintenanceLogs.collectAsState()
     val vehicles by viewModel.vehicles.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
-    val user = SupabaseClient.client.auth.currentUserOrNull()
     var showAddDialog by remember { mutableStateOf(false) }
 
-    LaunchedEffect(user?.id) {
-        user?.id?.let { viewModel.fetchOwnerData(it) }
+    LaunchedEffect(ownerId) {
+        viewModel.fetchOwnerData(ownerId)
     }
 
     Scaffold(
@@ -111,15 +113,17 @@ fun MaintenanceScreen(
                 AddMaintenanceDialog(
                     vehicles = vehicles,
                     onDismiss = { showAddDialog = false },
-                    onConfirm = { vehicleId, service, cost, description ->
+                    onConfirm = { vId: String, sType: String, cValue: Double, dText: String ->
+                        val vehicle = vehicles.find { it.id == vId }
                         val newLog = Maintenance(
-                            vehicle_id = vehicleId,
-                            service_type = service,
-                            cost = cost,
-                            description = description,
-                            date = LocalDate.now().toString()
+                            vehicle_id = vId,
+                            owner_id = vehicle?.owner_id ?: ownerId,
+                            service_type = sType,
+                            cost = cValue,
+                            description = dText,
+                            date = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
                         )
-                        user?.id?.let { viewModel.addMaintenanceLog(newLog, it) }
+                        viewModel.addMaintenanceLog(newLog, ownerId)
                         showAddDialog = false
                     }
                 )

@@ -30,6 +30,7 @@ import io.github.jan.supabase.auth.auth
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VehicleScreen(
+    ownerId: String,
     onNavigateToAddVehicle: () -> Unit,
     viewModel: OwnerViewModel = viewModel()
 ) {
@@ -38,12 +39,9 @@ fun VehicleScreen(
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.error.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
-    val user = SupabaseClient.client.auth.currentUserOrNull()
 
-    LaunchedEffect(user?.id) {
-        user?.id?.let { 
-            viewModel.fetchManagementData(it)
-        }
+    LaunchedEffect(ownerId) {
+        viewModel.fetchManagementData(ownerId)
     }
 
     LaunchedEffect(error) {
@@ -103,7 +101,7 @@ fun VehicleScreen(
                             drivers = drivers,
                             assignedDriver = assignedDriver,
                             onAssignDriver = { driverId ->
-                                viewModel.assignDriverToVehicle(vehicle, driverId)
+                                viewModel.assignDriverToVehicle(vehicle.id, driverId, ownerId)
                             }
                         )
                     }
